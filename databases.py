@@ -41,7 +41,7 @@ def add_expenses(amount,category,date,notes):
     data.insert_one(record)
     return True
 
-def view():
+def view_gui():
     x=list(data.find())
     if not x:
         print("No expense Found ")
@@ -55,7 +55,42 @@ def view():
         #date formating
         df["date"]=df["date"].dt.strftime("%d/%m/%y")
         return df 
+def view():
+    x=list(data.find())
+    if not x:
+        print("No expense Found ")
+    else:
+        df=pd.DataFrame(x)
+        df=df.drop(columns=["_id"])
+        #ensuring that date column is in date time format 
+        df["date"]=pd.to_datetime(df["date"])
+        #sort the values 
+        df=df.sort_values(by="date",ascending=True)
+        #date formating
+        df["date"]=df["date"].dt.strftime("%d/%m/%y")
+        print(df)
+def get_summary(group_by='category'):
+    """Return summarized totals from expenses grouped by category/month/week."""
+    df = view()  # reuse your view() to get all data as DataFrame
+    if df.empty:
+        return pd.DataFrame(columns=['Group','Total'])
 
+    # convert date column back to datetime for grouping
+    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%y')
+
+    if group_by == 'month':
+        df['month'] = df['date'].dt.to_period('M')
+        grouped = df.groupby('month')['amount'].sum().reset_index()
+        grouped.rename(columns={'month':'Group','amount':'Total'}, inplace=True)
+    elif group_by == 'week':
+        df['week'] = df['date'].dt.to_period('W')
+        grouped = df.groupby('week')['amount'].sum().reset_index()
+        grouped.rename(columns={'week':'Group','amount':'Total'}, inplace=True)
+    else:  # default category
+        grouped = df.groupby('category')['amount'].sum().reset_index()
+        grouped.rename(columns={'category':'Group','amount':'Total'}, inplace=True)
+
+    return grouped
 def delete():
     x=list(data.find().sort("date",1))
     if(not x):

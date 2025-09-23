@@ -6,6 +6,18 @@ root =tk.Tk()
 root.title("Expense Tracker")
 root.geometry("400x400")
 
+# Dropdown to choose summary type
+summary_option = tk.StringVar(value='category')
+options = ['category','month','week']
+ttk.Label(root, text="Summary by:").pack()
+ttk.OptionMenu(root, summary_option, options[0], *options).pack()
+
+# Treeview for summary display
+tree = ttk.Treeview(root, columns=("Group","Total"), show='headings')
+tree.heading("Group", text="Group")
+tree.heading("Total", text="Total")
+tree.pack(fill='both', expand=True)
+
 def add_expenses():
     add_win=tk.Toplevel(root)
     add_win.title("Add Expenses")
@@ -60,7 +72,7 @@ def view_expenses(root):
     tree.column("notes",width=100)
     tree.pack(fill=tk.BOTH,expand=True)
     try:
-        data=db.view()
+        data=db.view_gui()
         if data is not None and not data.empty:
             for _,row in data.iterrows():
                 tree.insert("",tk.END,values=(row['date'],row['category'],row['Amount'],row['notes']))
@@ -71,14 +83,19 @@ def view_expenses(root):
     tk.Button(view_win,text="Close",command=view_win.destroy).pack(pady=5)
 
 def show_summary():
-    db.summary()
+    for i in tree.get_children():
+        tree.delete(i)
+    df = db.get_summary(summary_option.get())
+    for _, row in df.iterrows():
+        tree.insert("", tk.END, values=(row['Group'], row['Total']))
+
 def exit_app():
     root.destroy()
 
 tk.Label(root,text="Expense Tracker",font=("Arial",16)).pack(pady=10)
 tk.Button(root,text="Add Expenses",width=20,command=add_expenses).pack(pady=5)
 tk.Button(root,text="View All Expenses",width=20,command=lambda:view_expenses(root)).pack(pady=5)
-tk.Button(root,text="Summary",width=20,command=show_summary).pack(pady=5)
+ttk.Button(root, text="Show Summary", command=show_summary).pack()
 tk.Button(root,text="Exit",width=20,command=exit_app).pack(pady=5)
 
 root.mainloop()
