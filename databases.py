@@ -1,239 +1,154 @@
 import pymongo as mg
 import pandas as pd
-import matplotlib.pyplot as plt 
 from datetime import datetime
-Client=mg.MongoClient("mongodb://localhost:27017/")
-db=Client["Expense"]
-data=db["My_bill"]
-def add():
-    dic={"Amount":0,"category":0,"date":None,"notes":0}
-    a=int(input("enter the amount: "))
-    if(a<0):
-        print("enter a valid amount!!")
-    else:
-        dic["Amount"]=a
-        p=int(input("select category : \n1 Food\n2 Transport\n3 Shopping\n4 Others: "))
-        if(p==1):
-            o="Food"
-        elif(p==2):
-            o="Transport"
-        elif(p==3):
-            o="Shopping"
-        else:
-            o="Others"
-        dic["category"]=o
-        q=input("Take todays date ? (y/n): ").lower()
-        if(q=="y"):
-            dic["date"]=datetime.today()
-        else:
-            d=input("enter date (dd/mm/yy): ")
-            try:
-                dic["date"]=datetime.strptime(d,"%d/%m/%y")
-            except ValueError:
-                print("invalid format of date!! Using todays date")
-                dic["date"]=datetime.today()
-        dic["notes"]=input("note==>: ")
-        data.insert_one(dic)
-        print("Expense add successfully!!")
+from datetime import date
+from bson.objectid import ObjectId # Import ObjectId for user lookup
 
-def add_expenses(amount,category,date,notes):
-    record={'Amount':float(amount),'category':category,'date':date,'notes':notes}
-    data.insert_one(record)
-    return True
+# --- Configuration ---
+MONGO_URI = "mongodb://localhost:27017/"
+CLIENT = mg.MongoClient(MONGO_URI)
+DB = CLIENT["Expense"]
+USERS_COLLECTION = DB["users"]
+EXPENSES_COLLECTION = DB["My_bill"]
+CATEGORIES = ["Food", "Transport", "Shopping", "Others", "Utilities", "Entertainment"]
 
-def view_gui():
-    x=list(data.find())
-    if not x:
-        print("No expense Found ")
-    else:
-        df=pd.DataFrame(x)
-        df=df.drop(columns=["_id"])
-        #ensuring that date column is in date time format 
-        df["date"]=pd.to_datetime(df["date"])
-        #sort the values 
-        df=df.sort_values(by="date",ascending=True)
-        #date formating
-        df["date"]=df["date"].dt.strftime("%d/%m/%y")
-        return df 
-def view():
-    x=list(data.find())
-    if not x:
-        print("No expense Found ")
-    else:
-        df=pd.DataFrame(x)
-        df=df.drop(columns=["_id"])
-        #ensuring that date column is in date time format 
-        df["date"]=pd.to_datetime(df["date"])
-        #sort the values 
-        df=df.sort_values(by="date",ascending=True)
-        #date formating
-        df["date"]=df["date"].dt.strftime("%d/%m/%y")
-        print(df)
-def get_summary(group_by='category'):
-    """Return summarized totals from expenses grouped by category/month/week."""
-    df = view()  # reuse your view() to get all data as DataFrame
+# --- User Management Functions (for Authentication) ---
+
+def add_user(username, password_hash):
+    """Inserts a new user into the database."""
+    if USERS_COLLECTION.find_one({"username": username}):
+        raise ValueError("Username already exists.")
+    
+    user_data = {
+        "username": username,
+        "password_hash": password_hash,
+    }
+    result = USERS_COLLECTION.insert_one(user_data)
+    return str(result.inserted_id)
+
+def get_user_by_username(username):
+    """Finds a user by username."""
+    user = USERS_COLLECTION.find_one({"username": username})
+    return user
+
+def get_user_by_id(user_id):
+    """Finds a user by MongoDB ObjectId string."""
+    try:
+        # Use ObjectId to query by the primary key
+        user = USERS_COLLECTION.find_one({"_id": ObjectId(user_id)})
+        return user
+    except Exception:
+        return None
+
+# --- Expense Management Functions (all require user_id) ---
+
+def add_expenses(user_id, amount, category, date_str, notes):
+    """Adds a new expense for a specific user."""
+    try:
+        # Convert web form date string (YYYY-MM-DD) to datetime object
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        
+        record = {
+            # Ensure user_id is stored as a string or ObjectId depending on how you want to query later
+            'user_id': user_id, 
+            'Amount': float(amount),
+            'category': category,
+            'date': date_obj,
+            'notes': notes if notes else "No notes"
+        }
+        EXPENSES_COLLECTION.insert_one(record)
+        return True
+    except ValueError as e:
+        print(f"Error converting data: {e}")
+        return False
+    except Exception as e:
+        print(f"Database error during add: {e}")
+        return False
+
+def get_user_expenses_df(user_id):
+    """Fetches all expenses for a user and returns them as a clean DataFrame."""
+    try:
+        # Filter expenses only for the current user
+        expense_list = list(EXPENSES_COLLECTION.find({"user_id": user_id}).sort("date", 1))
+        
+        if not expense_list:
+            return pd.DataFrame() 
+
+        df = pd.DataFrame(expense_list)
+        df = df.drop(columns=["_id", "user_id"], errors='ignore')
+        
+        # Ensure date column is datetime and format for display
+        df["date"] = pd.to_datetime(df["date"])
+        # Add a column for display formatting
+        df["display_date"] = df["date"].dt.strftime("%d/%m/%y") 
+        
+        # Ensure amount is numeric for calculations
+        df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce')
+        df.dropna(subset=['Amount'], inplace=True)
+
+        return df.sort_values(by="date", ascending=False)
+    except Exception as e:
+        print(f"Error fetching data for user {user_id}: {e}")
+        return pd.DataFrame()
+
+def get_summary_data(user_id, group_by='category'):
+    """Returns summarized totals grouped by category, month, or week, filtered by user."""
+    df = get_user_expenses_df(user_id)
     if df.empty:
-        return pd.DataFrame(columns=['Group','Total'])
-
-    # convert date column back to datetime for grouping
-    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%y')
+        return pd.DataFrame(columns=['Group', 'Total'])
 
     if group_by == 'month':
-        df['month'] = df['date'].dt.to_period('M')
-        grouped = df.groupby('month')['amount'].sum().reset_index()
-        grouped.rename(columns={'month':'Group','amount':'Total'}, inplace=True)
+        df['Group'] = df['date'].dt.strftime('%Y-%m') # Year-Month
     elif group_by == 'week':
-        df['week'] = df['date'].dt.to_period('W')
-        grouped = df.groupby('week')['amount'].sum().reset_index()
-        grouped.rename(columns={'week':'Group','amount':'Total'}, inplace=True)
-    else:  # default category
-        grouped = df.groupby('category')['amount'].sum().reset_index()
-        grouped.rename(columns={'category':'Group','amount':'Total'}, inplace=True)
+        # ISO week numbering for grouping
+        df['Group'] = df['date'].dt.strftime('%Y-W%W') 
+    else:  # category is default
+        df['Group'] = df['category']
 
-    return grouped
-def delete():
-    x=list(data.find().sort("date",1))
-    if(not x):
-        print("not data found")
-    else:
-        df=pd.DataFrame(x)
-        df=df.drop(columns=["_id"])
-        df["date"]=pd.to_datetime(df["date"])
-        df=df.sort_values(by="date",ascending=True)
-        df["date"]=df["date"].dt.strftime("%d/%m/%y")
-        print(df.to_string(index=True))
-        try:
-            ind=int(input("enter the index of the expense you want to delete: "))
-            r=x[ind]
-            data.delete_one({"_id":r["_id"]})
-            print("data deleted succesfully!!!")
-        except(ValueError,IndexError):
-            print("some error occur !!")
-
+    # Aggregate and clean up
+    grouped = df.groupby('Group')['Amount'].sum().reset_index()
+    grouped.rename(columns={'Amount': 'Total'}, inplace=True)
+    grouped['Total'] = grouped['Total'].round(2)
     
-def update():
-    x=list(data.find().sort("date",1))
-    if(not x):
-        print("not data found")
-    else:
-        df=pd.DataFrame(x)
-        df=df.drop(columns=["_id"])
-        df["date"]=pd.to_datetime(df["date"])
-        df=df.sort_values(by="date",ascending=True)
-        df["date"]=df["date"].dt.strftime("%d/%m/%y")
-        print(df.to_string(index=True))
-    try:
-        ind=int(input("enter the index of the expense you want to do changes: "))
-        r=x[ind]
-        prev={"_id":r["_id"]}
-        p=int(input("select parameter you want to do changes : \n1 Amount\n2 category\n3 date\n4 notes: "))
-        if(p==1):
-            o="Amount"
-            a=int(input("enter the amount: "))
-            if(a<0):
-                print("enter a valid amount!!")
-            else:
-                g=a
-        elif(p==2):
-            o="category"
-            g=input("enter the updated category: ")
-        elif(p==3):
-            o="date"
-            d=input("enter the updated date")
-            try:
-                g=datetime.strptime(d,"%d/%m/%y")
-            except ValueError:
-                print("invalid format of date!! Using todays date")
-                g=datetime.today()
-        else:
-            o="notes"
-            g=input("Enter the updated notes: ")        
-        nexxt={"$set":{o:g}}
-        data.update_one(prev,nexxt)
-        print("data updated succesfully!!!")
-    except:
-        print("Something went wrong!!")
+    return grouped
+    
+def get_dashboard_stats(user_id):
+    """Calculates key statistics for the dashboard."""
+    df = get_user_expenses_df(user_id)
+    
+    if df.empty:
+        return {
+            "total_expenses": 0.00,
+            "month_expenses": 0.00,
+            "week_expenses": 0.00,
+            "total_records": 0,
+            "category_breakdown": {}
+        }
+        
+    # --- 1. Total Expenses and Records ---
+    total = df['Amount'].sum().round(2)
+    total_records = len(df)
+    
+    # --- 2. Current Month and Week Totals ---
+    
+    # Filter for the current month
+    today = datetime.now()
+    current_month = df['date'].dt.to_period('M') == pd.Period(today, freq='M')
+    month_expenses = df[current_month]['Amount'].sum().round(2)
+    
+    # Filter for the current week (ISO Week)
+    current_year_week = today.strftime('%Y-%W')
+    df['YearWeek'] = df['date'].dt.strftime('%Y-%W')
+    current_week = df['YearWeek'] == current_year_week
+    week_expenses = df[current_week]['Amount'].sum().round(2)
 
-def Total_category():
-    x=list(data.find().sort("date",1))
-    df=pd.DataFrame(x)
-    # p=int(input("select category : \n1 Food\n2 Transport\n3 Shopping\n4 Others: "))
-    # if(p==1):
-    #     o="Food"
-    # elif(p==2):
-    #     o="Transport"
-    # elif(p==3):
-    #     o="Shopping"
-    # else:
-    #     o="Others"
-    group=df.groupby('category')['Amount'].sum()
-    group.plot.pie(autopct='%1.1f%%',startangle=90)
-    plt.title('Expenses by category')
-    plt.ylabel('')
-    plt.show()
-    # print(group)
-
-def Total_month():
-    x=list(data.find().sort("date",1))
-    df=pd.DataFrame(x)
-    df['Date']=pd.to_datetime(df['date'],format='%d/%m/%y')
-    df['month']=df['Date'].dt.to_period('M')
-    monthly=df.groupby('month')['Amount'].sum()
-    # print(monthly)
-    monthly.plot(kind="bar")
-    plt.title("Montly expenses")
-    plt.xlabel("month")
-    plt.ylabel('Total Amount')
-    plt.show()
-
-def Total_week():
-    x=list(data.find().sort("date",1))
-    df=pd.DataFrame(x)
-    df['Date']=pd.to_datetime(df['date'],format="%d/%m/%y")
-    df['week']=df['Date'].dt.isocalendar().week
-    weekly=df.groupby('week')['Amount'].sum()
-    weekly.plot(kind="bar")
-    plt.title("weekly exepenses")
-    plt.xlabel("week")
-    plt.ylabel("amount")
-    plt.show()
-    # print(weekly)
-
-def Total_all():
-    x=list(data.find().sort("date",1))
-    df=pd.DataFrame(x)
-    print("Total = ",df['Amount'].sum())
-
-
-def export_data(a):
-    b=a+'.csv'
-    x=list(data.find())
-    if not x:
-        print("No expense Found ")
-    else:
-        df=pd.DataFrame(x)
-        df=df.drop(columns=["_id"])
-        #ensuring that date column is in date time format 
-        df["date"]=pd.to_datetime(df["date"])
-        #sort the values 
-        df=df.sort_values(by="date",ascending=True)
-        #date formating
-        df["date"]=df["date"].dt.strftime("%d/%m/%y")
-        df.to_csv(b,index=False)
-        print(f"data exported as {b}")
-
-def summary():
-    x=list(data.find().sort('date',1))
-    df=pd.DataFrame(x)
-    df["date"]=pd.to_datetime(df["date"])
-    total=df['Amount'].sum()
-    categoryy=df.groupby('category')['Amount'].sum().sort_values(ascending=False).head(3)
-    daily_avg=df.groupby(df['date'].dt.date)['Amount'].sum().mean()
-    month_avg=df.groupby(df['date'].dt.to_period('M'))['Amount'].sum().mean()
-    print("\n==== EXPENSE SUMMARY ===")
-    print(f"Total Expenses: {total}")
-    print("\nTop 3 Categories:")
-    print(categoryy)
-    print(f"Average Daily Spending: {daily_avg:.2f}")
-    print(f"Average monthly Spending: {month_avg:.2f}")
-    print("=======================================\n")
+    # --- 3. Category Breakdown (for dashboard) ---
+    category_breakdown = df.groupby('category')['Amount'].sum().sort_values(ascending=False).to_dict()
+    
+    return {
+        "total_expenses": total,
+        "month_expenses": month_expenses,
+        "week_expenses": week_expenses,
+        "total_records": total_records,
+        "category_breakdown": category_breakdown
+    }

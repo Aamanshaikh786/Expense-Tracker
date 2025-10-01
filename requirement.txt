@@ -1,0 +1,6 @@
+Flask
+Flask-Login
+pymongo
+pandas
+plotly
+plotly-express

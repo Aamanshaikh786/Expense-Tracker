@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Summary{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-6 fw-bold text-white">
+            <i class="bi bi-bar-chart"></i> Expense Summary
+        </h1>
+        <p class="text-white-50">Visual insights into your spending patterns</p>
+    </div>
+</div>
+
+<!-- Filter Options -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-funnel"></i> Group By
+                </h6>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('summary', group_by='category') }}" 
+                       class="btn {% if group_by == 'category' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        <i class="bi bi-tag"></i> Category
+                    </a>
+                    <a href="{{ url_for('summary', group_by='month') }}" 
+                       class="btn {% if group_by == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        <i class="bi bi-calendar-month"></i> Month
+                    </a>
+                    <a href="{{ url_for('summary', group_by='week') }}" 
+                       class="btn {% if group_by == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        <i class="bi bi-calendar-week"></i> Week
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Total Expense Card -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border: none;">
+            <div class="card-body text-center py-4">
+                <h3 class="fw-bold mb-2">Total Expenses</h3>
+                <div style="font-size: 3rem; font-weight: 700;">${{ total_expense|default(0) }}</div>
+                <p class="mb-0 opacity-75">Grouped by {{ group_by }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart -->
+{% if graph_json %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-graph-up"></i> Visual Breakdown
+                </h5>
+                <div id="chart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card text-center py-5">
+            <div class="card-body">
+                <i class="bi bi-graph-down" style="font-size: 4rem; color: #cbd5e1;"></i>
+                <h3 class="mt-3 mb-2">No Data Available</h3>
+                <p class="text-muted mb-4">Add some expenses to see your summary charts</p>
+                <a href="{{ url_for('add_expense') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add Expense
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Insights Card -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card" style="background: rgba(255, 255, 255, 0.1); color: white; border: none;">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-lightbulb-fill"></i> Spending Insights
+                </h6>
+                <ul class="mb-0">
+                    <li>Track your expenses regularly for better financial management</li>
+                    <li>Use different groupings to identify spending patterns</li>
+                    <li>Consider setting budget limits for each category</li>
+                    <li>Export your data for detailed analysis in spreadsheet applications</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if graph_json %}
+<script>
+    // Render Plotly chart
+    try {
+        // FIX: Add a check for an empty string before parsing.
+        const graphJsonString = '{{ graph_json|safe }}'; 
+        
+        if (graphJsonString.trim() !== '') {
+            const graphData = JSON.parse(graphJsonString);
+            Plotly.newPlot('chart', graphData.data, graphData.layout, {responsive: true});
+        } else {
+            // Handle the case where graph_json is an empty string (no data)
+            document.getElementById('chart').innerHTML = "<p class='text-muted text-center'>No expense data available to render chart.</p>";
+        }
+        
+    } catch (e) {
+        // The error handling needs to check if the chart div exists, preventing the second error.
+        console.error("Error rendering Plotly chart:", e);
+        const chartDiv = document.getElementById('chart');
+        if (chartDiv) {
+            chartDiv.innerHTML = "<p class='text-danger text-center'>Error loading chart data.</p>";
+        }
+    }
+</script>
+{% endif %}
+{% endblock %}

@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk,messagebox
-import databases as db
+import original_databases as db
 Categories=["Food","Transport","Shopping","Others"]
 root =tk.Tk()
 root.title("Expense Tracker")

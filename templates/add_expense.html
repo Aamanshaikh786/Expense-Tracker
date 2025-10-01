@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Add Expense{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-6 fw-bold text-white">
+            <i class="bi bi-plus-circle"></i> Add New Expense
+        </h1>
+        <p class="text-white-50">Record a new expense in your tracker</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('add_expense') }}">
+                    <div class="row g-3">
+                        <!-- Amount -->
+                        <div class="col-md-6">
+                            <label for="amount" class="form-label fw-bold">
+                                <i class="bi bi-currency-dollar"></i> Amount
+                            </label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="amount" 
+                                   name="amount" 
+                                   step="0.01" 
+                                   min="0.01"
+                                   placeholder="0.00" 
+                                   required 
+                                   autofocus>
+                        </div>
+
+                        <!-- Category -->
+                        <div class="col-md-6">
+                            <label for="category" class="form-label fw-bold">
+                                <i class="bi bi-tag"></i> Category
+                            </label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="">Select a category</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Date -->
+                        <div class="col-md-6">
+                            <label for="date" class="form-label fw-bold">
+                                <i class="bi bi-calendar"></i> Date
+                            </label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="date" 
+                                   name="date" 
+                                   value="{{ today }}"
+                                   required>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="col-md-12">
+                            <label for="notes" class="form-label fw-bold">
+                                <i class="bi bi-journal-text"></i> Notes
+                            </label>
+                            <textarea class="form-control" 
+                                      id="notes" 
+                                      name="notes" 
+                                      rows="3" 
+                                      placeholder="Add any additional details about this expense..."></textarea>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="col-md-12">
+                            <div class="d-flex gap-3 justify-content-end mt-3">
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-circle"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> Add Expense
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Tips -->
+        <div class="card mt-4" style="background: rgba(255, 255, 255, 0.1); color: white; border: none;">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-lightbulb"></i> Quick Tips
+                </h6>
+                <ul class="mb-0">
+                    <li>Be specific with your notes for better tracking</li>
+                    <li>Choose the most appropriate category for accurate summaries</li>
+                    <li>You can view and edit your expenses anytime from the View Expenses page</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set today's date as default
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.getElementById('date');
+        if (!dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+    });
+</script>
+{% endblock %}
