@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Expense{% endblock %}
+
+{% block content %}
+
+<div class="row mb-4">
+<div class="col">
+<h1 class="display-6 fw-bold text-white">
+<i class="bi bi-pencil-square"></i> Edit Expense #{{ expense.id|truncate(8, True, '') }}
+</h1>
+<p class="text-white-50">Modify the details of your recorded expense</p>
+</div>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-md-8">
+<div class="card">
+<div class="card-body p-4">
+<form method="POST" action="{{ url_for('edit_expense', expense_id=expense.id) }}">
+<div class="row g-3">
+<!-- Amount -->
+<div class="col-md-6">
+<label for="amount" class="form-label fw-bold">
+<i class="bi bi-currency-rupee"></i> Amount ({{ currency }})
+</label>
+<input type="number"
+class="form-control"
+id="amount"
+name="amount"
+step="0.01"
+min="0.01"
+placeholder="0.00"
+value="{{ expense.Amount }}"
+required
+autofocus>
+</div>
+
+                    <!-- Category -->
+                    <div class="col-md-6">
+                        <label for="category" class="form-label fw-bold">
+                            <i class="bi bi-tag"></i> Category
+                        </label>
+                        <select class="form-select" id="category" name="category" required>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if cat == expense.category %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="col-md-6">
+                        <label for="date" class="form-label fw-bold">
+                            <i class="bi bi-calendar"></i> Date
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="date" 
+                               name="date" 
+                               value="{{ expense.date_formatted }}"
+                               required>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="col-md-12">
+                        <label for="notes" class="form-label fw-bold">
+                            <i class="bi bi-journal-text"></i> Notes
+                        </label>
+                        <textarea class="form-control" 
+                                  id="notes" 
+                                  name="notes" 
+                                  rows="3" 
+                                  placeholder="Add any additional details about this expense...">{{ expense.notes }}</textarea>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="col-md-12">
+                        <div class="d-flex gap-3 justify-content-end mt-3">
+                            <a href="{{ url_for('view_expenses') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}

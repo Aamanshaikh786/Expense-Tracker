@@ -45,7 +45,7 @@
         <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border: none;">
             <div class="card-body text-center py-4">
                 <h3 class="fw-bold mb-2">Total Expenses</h3>
-                <div style="font-size: 3rem; font-weight: 700;">${{ total_expense|default(0) }}</div>
+                <div style="font-size: 3rem; font-weight: 700;">{{ currency }}{{ total_expense|default(0)|round(2) }}</div>
                 <p class="mb-0 opacity-75">Grouped by {{ group_by }}</p>
             </div>
         </div>
@@ -108,19 +108,16 @@
 <script>
     // Render Plotly chart
     try {
-        // FIX: Add a check for an empty string before parsing.
         const graphJsonString = '{{ graph_json|safe }}'; 
         
         if (graphJsonString.trim() !== '') {
             const graphData = JSON.parse(graphJsonString);
             Plotly.newPlot('chart', graphData.data, graphData.layout, {responsive: true});
         } else {
-            // Handle the case where graph_json is an empty string (no data)
             document.getElementById('chart').innerHTML = "<p class='text-muted text-center'>No expense data available to render chart.</p>";
         }
         
     } catch (e) {
-        // The error handling needs to check if the chart div exists, preventing the second error.
         console.error("Error rendering Plotly chart:", e);
         const chartDiv = document.getElementById('chart');
         if (chartDiv) {

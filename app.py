@@ -1,188 +1,313 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from bson.objectid import ObjectId
-import databases as db
-import plotly.express as px
+import os
 import json
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+import plotly.express as px
 import plotly.utils
+from databases import create_user, get_user_by_username, get_user_by_id, add_expenses, get_user_expenses_df, get_summary_data, get_dashboard_stats, get_expense_by_id, update_expense, delete_expense, view_expenses_by_user, verify_password
+from datetime import date as dt_date
+import pandas as pd
+CURRENCY = "₹"
 
-# --- Flask App Initialization ---
-app = Flask(__name__)
-# IMPORTANT: Change this secret key! Used for session security.
-app.config['SECRET_KEY'] = 'a_very_secret_and_long_key_you_should_change' 
+app = Flask(__name__, template_folder="templates")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change_this_secret_key")
 
-# --- Flask-Login Setup ---
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.login_message_category = 'warning'
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
 
+# Create a User class for Flask-Login
 class User(UserMixin):
-    """User class for Flask-Login"""
     def __init__(self, user_data):
+        self.user_data = user_data
         self.id = str(user_data['_id'])
         self.username = user_data['username']
-        self.password_hash = user_data['password_hash']
+
+@app.route("/test_data_flow")
+@login_required
+def test_data_flow():
+    """Test the complete data flow"""
+    from databases import EXPENSES_COLLECTION
+    from bson.objectid import ObjectId
+    
+    # 1. Check raw MongoDB data
+    raw_data = list(EXPENSES_COLLECTION.find({"user_id": ObjectId(current_user.id)}))
+    
+    result = "<h1>Data Flow Test</h1>"
+    
+    result += "<h2>1. Raw MongoDB Data:</h2>"
+    for item in raw_data:
+        result += f"<p>ID: {item['_id']}, Amount: {item.get('Amount')} (type: {type(item.get('Amount'))}), Category: {item.get('category')}</p>"
+    
+    # 2. Check DataFrame
+    df = get_user_expenses_df(current_user.id)
+    result += "<h2>2. DataFrame Data:</h2>"
+    result += f"<p>DataFrame shape: {df.shape}</p>"
+    if not df.empty:
+        result += f"<p>Columns: {df.columns.tolist()}</p>"
+        result += f"<p>Amount values: {df['Amount'].tolist()}</p>"
+    
+    # 3. Check Summary Data
+    summary_df = get_summary_data(current_user.id, "category")
+    result += "<h2>3. Summary Data for Chart:</h2>"
+    result += f"<p>Summary DataFrame: {summary_df.to_dict('records')}</p>"
+    
+    return result
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Callback to load user object from session ID."""
-    user_data = db.get_user_by_id(user_id)
+    user_data = get_user_by_id(user_id)
     if user_data:
         return User(user_data)
     return None
 
-# --- Routes ---
+def render_page(template, **kwargs):
+    return render_template(template, currency=CURRENCY, **kwargs)
 
-@app.route('/')
-@login_required
-def dashboard():
-    """Main dashboard showing summary statistics."""
-    # Use the enhanced function to get all dashboard stats
-    stats = db.get_dashboard_stats(current_user.id) 
-    # RENDER CHANGE: Use the specific template file
-    return render_template('dashboard.html', stats=stats)
-
-# --- Authentication Routes ---
-
-@app.route('/register', methods=['GET', 'POST'])
+# ----------------- AUTH -----------------
+@app.route("/register", methods=["GET", "POST"])
 def register():
-    """Route for new user registration."""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if not username or not password:
-            flash('Both username and password are required.', 'danger')
-            return redirect(url_for('register'))
-
-        try:
-            # Hash password before storing
-            hashed_password = generate_password_hash(password)
-            db.add_user(username, hashed_password)
-            flash('Registration successful! Please log in.', 'success')
-            return redirect(url_for('login'))
-        except ValueError as e:
-            flash(str(e), 'danger')
-        except Exception:
-            flash('A database error occurred during registration.', 'danger')
-    
-    # RENDER CHANGE: Use the specific template file
-    return render_template('register.html')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Route for user login."""
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        user_data = db.get_user_by_username(username)
-        
-        if user_data and check_password_hash(user_data['password_hash'], password):
-            user = User(user_data)
-            login_user(user)
-            flash('Logged in successfully.', 'success')
-            # Redirect to the page the user wanted to access, or dashboard
-            next_page = request.args.get('next')
-            return redirect(next_page or url_for('dashboard'))
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        u = request.form.get("username")
+        p = request.form.get("password")
+        if not u or not p:
+            flash("Username and password required", "danger")
         else:
-            flash('Invalid username or password.', 'danger')
+            success = create_user(u, p)
+            if success:
+                flash("Account created! Please log in.", "success")
+                return redirect(url_for("login"))
+            else:
+                flash("Username already exists", "danger")
+    return render_page("register.html")
 
-    # RENDER CHANGE: Use the specific template file
-    return render_template('login.html')
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        user_data = get_user_by_username(username)
+        
+        if user_data and verify_password(user_data, password):
+            user_obj = User(user_data)
+            login_user(user_obj)
+            flash(f"Welcome {username}!", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Invalid credentials", "danger")
+    return render_page("login.html")
 
-@app.route('/logout')
+@app.route("/logout")
 @login_required
 def logout():
-    """Route for logging out the current user."""
     logout_user()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
+    flash("Logged out successfully", "info")
+    return redirect(url_for("login"))
 
-# --- Expense Routes ---
+# ----------------- EXPENSE ROUTES -----------------
+@app.route("/")
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    stats = get_dashboard_stats(current_user.id)
+    return render_page("dashboard.html", stats=stats)
 
-@app.route('/add', methods=['GET', 'POST'])
+@app.route("/add_expense", methods=["GET", "POST"])
 @login_required
 def add_expense():
-    """Route to add a new expense."""
-    categories = db.CATEGORIES
-    if request.method == 'POST':
-        amount = request.form.get('amount')
-        category = request.form.get('category')
-        date_str = request.form.get('date')
-        notes = request.form.get('notes')
-        
-        if db.add_expenses(current_user.id, amount, category, date_str, notes):
-            flash(f'Expense of ${amount} added successfully!', 'success')
-            return redirect(url_for('view_expenses'))
+    cats = ["Food", "Transport", "Shopping", "Others"]
+    today = dt_date.today().isoformat()
+    if request.method == "POST":
+        success = add_expenses(
+            user_id=current_user.id,
+            amount=request.form.get("amount"),
+            category=request.form.get("category"),
+            date_str=request.form.get("date"),
+            notes=request.form.get("notes")
+        )
+        if success:
+            flash("Expense added!", "success")
+            return redirect(url_for("view_expenses"))
         else:
-            flash('Error adding expense. Check your input values.', 'danger')
+            flash("Error adding expense", "danger")
+    return render_page("add_expense.html", categories=cats, today=today)
 
-    # RENDER CHANGE: Use the specific template file
-    return render_template('add_expense.html', categories=categories)
-
-@app.route('/view')
+@app.route("/view")
 @login_required
 def view_expenses():
-    """Route to view all expenses in a table."""
-    df = db.get_user_expenses_df(current_user.id)
-    
-    # Convert DataFrame rows to a list of dicts for easy rendering in HTML
-    expenses_list = df.to_dict('records')
-    
-    # RENDER CHANGE: The user's filename is view_expenses.htm, not view_expenses.html.
-    # Note: Jinja2 can load both, but I'll use the user's provided filename for accuracy.
-    return render_template('view_expenses.htm', expenses=expenses_list)
+    expenses = view_expenses_by_user(current_user.id)
+    return render_page("view_expenses.html", expenses=expenses)
 
-@app.route('/summary')
+@app.route("/edit/<expense_id>", methods=["GET", "POST"])
+@login_required
+def edit_expense(expense_id):
+    expense = get_expense_by_id(expense_id, current_user.id)
+    cats = ["Food", "Transport", "Shopping", "Others"]
+    if not expense:
+        flash("Expense not found", "danger")
+        return redirect(url_for("view_expenses"))
+    if request.method == "POST":
+        success = update_expense(
+            expense_id, 
+            current_user.id,
+            request.form.get("amount"),
+            request.form.get("category"),
+            request.form.get("date"),
+            request.form.get("notes")
+        )
+        if success:
+            flash("Expense updated!", "success")
+            return redirect(url_for("view_expenses"))
+        else:
+            flash("Error updating expense", "danger")
+    
+    if "date" in expense and isinstance(expense["date"], datetime):
+        expense["date_formatted"] = expense["date"].strftime("%Y-%m-%d")
+    else:
+        expense["date_formatted"] = expense["date"]
+    
+    return render_page("edit_expense.html", expense=expense, categories=cats)
+
+@app.route("/delete/<expense_id>")
+@login_required
+def delete_expense(expense_id):
+    success = delete_expense(expense_id, current_user.id)
+    if success:
+        flash("Expense deleted!", "success")
+    else:
+        flash("Delete failed.", "danger")
+    return redirect(url_for("view_expenses"))
+
+@app.route("/summary")
 @login_required
 def summary():
-    """Route to show expense summaries and charts."""
-    group_by = request.args.get('group_by', 'category')
-    summary_df = db.get_summary_data(current_user.id, group_by)
+    group_by = request.args.get("group_by", "category")
+    df = get_summary_data(current_user.id, group_by)
     
-    # Total expenses for display
-    total_expense = summary_df['Total'].sum().round(2)
-    graph_json = "" # Initialize to empty string
-
-    # Plotly integration for interactive chart
-    # FIX: Check if DataFrame is NOT empty before attempting to plot
-    if not summary_df.empty: 
-        if group_by == 'category':
-            fig = px.pie(summary_df, values='Total', names='Group', title='Expenses by Category',
-                         hole=.3, color_discrete_sequence=px.colors.sequential.RdBu)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
+    total = df["Total"].sum() if not df.empty else 0
+    graph_json = ""
+    
+    if not df.empty:
+        # FIX: Manual chart creation to avoid any automatic normalization
+        if group_by == "category":
+            # Create pie chart manually
+            import plotly.graph_objects as go
+            
+            fig = go.Figure(data=[go.Pie(
+                labels=df['Group'].tolist(),
+                values=df['Total'].tolist(),
+                hole=0.3,
+                textinfo='label+value+percent',
+                texttemplate='%{label}<br>' + CURRENCY + '%{value:.2f}<br>(%{percent})',
+                hovertemplate='<b>%{label}</b><br>' + f'Amount: {CURRENCY}%{{value:.2f}}<br>Percentage: %{{percent}}<extra></extra>'
+            )])
+            
+            fig.update_layout(
+                title_text=f"Expenses by Category ({CURRENCY})",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#2c3e50", size=12),
+                height=500,
+                showlegend=True
+            )
+            
         else:
-            fig = px.bar(summary_df, x='Group', y='Total', title=f'Expenses by {group_by.capitalize()}',
-                         labels={'Group': group_by.capitalize(), 'Total': 'Total Amount'},
-                         color='Group', color_discrete_sequence=px.colors.qualitative.Bold)
-            fig.update_layout(xaxis_tickangle=-45)
+            # Create bar chart manually
+            import plotly.graph_objects as go
+            
+            fig = go.Figure(data=[go.Bar(
+                x=df['Group'].tolist(),
+                y=df['Total'].tolist(),
+                text=[f'{CURRENCY}{val:.2f}' for val in df['Total']],
+                textposition='outside',
+                marker_color='#6366f1',
+                hovertemplate='<b>%{x}</b><br>' + f'Amount: {CURRENCY}%{{y:.2f}}<extra></extra>'
+            )])
+            
+            fig.update_layout(
+                title_text=f"Expenses by {group_by.capitalize()} ({CURRENCY})",
+                xaxis_title=group_by.capitalize(),
+                yaxis_title=f"Amount ({CURRENCY})",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#2c3e50", size=12),
+                height=500
+            )
+            
+            if group_by in ['month', 'week']:
+                fig.update_xaxes(tickangle=45)
         
-        # Convert the Plotly figure to JSON for embedding in the HTML template
-        graph_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder) 
-    else:
-        # If the DataFrame is empty, ensure graph_json is an empty string
-        graph_json = ""
-        
-    # RENDER CHANGE: Use the specific template file
-    return render_template('summary.html', graph_json=graph_json, group_by=group_by, total_expense=total_expense)
-
-# --- Run Application ---
-if __name__ == '__main__':
-    # Add a check to ensure users collection exists for the first run
-    if "users" not in db.DB.list_collection_names():
-        db.DB.create_collection("users")
+        graph_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
     
-    print("---------------------------------------------------------")
-    print(f"Flask Expense Tracker running at http://127.0.0.1:5000/")
-    print("---------------------------------------------------------")
-    # Set debug to False for production environment, but keep it True for development
+    return render_page("summary.html", graph_json=graph_json, group_by=group_by, total_expense=total)
+
+@app.route("/debug_raw_data")
+@login_required
+def debug_raw_data():
+    """Debug route to check raw expense data"""
+    from databases import EXPENSES_COLLECTION
+    from bson.objectid import ObjectId
+    
+    # Get raw data from MongoDB
+    raw_expenses = list(EXPENSES_COLLECTION.find({"user_id": ObjectId(current_user.id)}))
+    
+    debug_info = "<h1>Raw Expense Data Debug</h1>"
+    debug_info += f"<p>User ID: {current_user.id}</p>"
+    debug_info += f"<p>Number of expenses: {len(raw_expenses)}</p>"
+    
+    debug_info += "<h3>Raw MongoDB Data:</h3>"
+    for expense in raw_expenses:
+        debug_info += f"<pre>{expense}</pre><hr>"
+    
+    # Get DataFrame data
+    df = get_user_expenses_df(current_user.id)
+    debug_info += "<h3>DataFrame Data:</h3>"
+    debug_info += f"<pre>{df.to_string() if not df.empty else 'No data'}</pre>"
+    
+    debug_info += "<h3>Summary Data:</h3>"
+    summary_df = get_summary_data(current_user.id, "category")
+    debug_info += f"<pre>{summary_df.to_string() if not summary_df.empty else 'No data'}</pre>"
+    
+    return debug_info
+
+@app.route("/debug_summary")
+@login_required
+def debug_summary():
+    """Debug route to check summary data"""
+    group_by = request.args.get("group_by", "category")
+    df = get_summary_data(current_user.id, group_by)
+    
+    print("=== DEBUG SUMMARY DATA ===")
+    print(f"Group by: {group_by}")
+    print(f"DataFrame shape: {df.shape}")
+    print(f"DataFrame columns: {df.columns.tolist()}")
+    print(f"DataFrame data:")
+    print(df)
+    print(f"Total sum: {df['Total'].sum() if not df.empty else 0}")
+    print("==========================")
+    
+    return f"""
+    <h1>Debug Summary Data</h1>
+    <p>Group by: {group_by}</p>
+    <p>DataFrame shape: {df.shape}</p>
+    <p>Total sum: {df['Total'].sum() if not df.empty else 0}</p>
+    <h3>Data:</h3>
+    <pre>{df.to_string() if not df.empty else 'No data'}</pre>
+    """
+# Reset database (for testing)
+@app.route("/reset")
+def reset_database():
+    """Reset database for testing"""
+    from databases import USERS_COLLECTION, EXPENSES_COLLECTION
+    USERS_COLLECTION.delete_many({})
+    EXPENSES_COLLECTION.delete_many({})
+    flash("Database reset successfully", "info")
+    return redirect(url_for("register"))
+
+if __name__ == "__main__":
+    print("Flask Expense Tracker running at http://127.0.0.1:5000/")
     app.run(debug=True)

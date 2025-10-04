@@ -1,278 +1,281 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Tracker - {% block title %}Home{% endblock %}</title>
-    <meta name="description" content="Track and manage your expenses efficiently">
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <!-- Plotly for charts -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    
-    <style>
-        :root {
-            --primary-color: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary-color: #8b5cf6;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --dark-bg: #1e293b;
-            --light-bg: #f8fafc;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expense Tracker - {% block title %}Home{% endblock %}</title>
+<meta name="description" content="Track and manage your expenses efficiently">
 
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+<!-- Plotly for charts -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-        .navbar {
-            background: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        }
+<style>
+    :root {
+        --primary-color: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary-color: #8b5cf6;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --dark-bg: #1e293b;
+        --light-bg: #f8fafc;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
 
-        .navbar-brand {
-            font-weight: 700;
-            color: var(--primary-color) !important;
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .navbar {
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    .navbar-brand {
+        font-weight: 700;
+        color: var(--primary-color) !important;
+        font-size: 1.5rem;
+    }
+
+    .main-content {
+        padding: 2rem 0;
+        min-height: calc(100vh - 200px);
+    }
+
+    .card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .stat-card {
+        padding: 1.5rem;
+        background: white;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .stat-card.success {
+        border-left-color: var(--success-color);
+    }
+
+    .stat-card.warning {
+        border-left-color: var(--warning-color);
+    }
+
+    .stat-card.danger {
+        border-left-color: var(--danger-color);
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--dark-bg);
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.75rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .auth-container {
+        max-width: 450px;
+        margin: 3rem auto;
+    }
+
+    .auth-card {
+        background: white;
+        padding: 3rem;
+        border-radius: 20px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .table {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+    }
+
+    .table tbody tr {
+        transition: background-color 0.2s ease;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .badge {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    .category-badge.food {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .category-badge.transport {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+
+    .category-badge.shopping {
+        background-color: #fce7f3;
+        color: #9f1239;
+    }
+
+    .category-badge.others {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+
+    .alert {
+        border-radius: 12px;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+
+    .footer {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        padding: 2rem 0;
+        margin-top: 4rem;
+        backdrop-filter: blur(10px);
+    }
+
+    @media (max-width: 768px) {
+        .stat-number {
             font-size: 1.5rem;
         }
-
-        .main-content {
-            padding: 2rem 0;
-            min-height: calc(100vh - 200px);
-        }
-
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .stat-card {
-            padding: 1.5rem;
-            background: white;
-            border-left: 4px solid var(--primary-color);
-        }
-
-        .stat-card.success {
-            border-left-color: var(--success-color);
-        }
-
-        .stat-card.warning {
-            border-left-color: var(--warning-color);
-        }
-
-        .stat-card.danger {
-            border-left-color: var(--danger-color);
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--dark-bg);
-        }
-
-        .stat-label {
-            color: #64748b;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
-        }
-
-        .form-control, .form-select {
-            border-radius: 8px;
-            border: 2px solid #e2e8f0;
-            padding: 0.75rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .auth-container {
-            max-width: 450px;
-            margin: 3rem auto;
-        }
-
         .auth-card {
-            background: white;
-            padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
         }
+    }
+</style>
 
-        .table {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .table thead {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-        }
-
-        .table tbody tr {
-            transition: background-color 0.2s ease;
-        }
-
-        .table tbody tr:hover {
-            background-color: #f8fafc;
-        }
-
-        .badge {
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-
-        .category-badge.food {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
-
-        .category-badge.transport {
-            background-color: #dbeafe;
-            color: #1e40af;
-        }
-
-        .category-badge.shopping {
-            background-color: #fce7f3;
-            color: #9f1239;
-        }
-
-        .category-badge.others {
-            background-color: #e5e7eb;
-            color: #374151;
-        }
-
-        .alert {
-            border-radius: 12px;
-            border: none;
-            padding: 1rem 1.5rem;
-        }
-
-        .footer {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 2rem 0;
-            margin-top: 4rem;
-            backdrop-filter: blur(10px);
-        }
-
-        @media (max-width: 768px) {
-            .stat-number {
-                font-size: 1.5rem;
-            }
-            .auth-card {
-                padding: 2rem;
-            }
-        }
-    </style>
 </head>
 <body>
-    <!-- Navigation -->
-    {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <i class="bi bi-wallet2"></i> ExpenseTracker
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if page == 'dashboard' %}active fw-bold{% endif %}" href="{{ url_for('dashboard') }}">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if page == 'add_expense' %}active fw-bold{% endif %}" href="{{ url_for('add_expense') }}">
-                            <i class="bi bi-plus-circle"></i> Add Expense
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if page == 'view_expenses' %}active fw-bold{% endif %}" href="{{ url_for('view_expenses') }}">
-                            <i class="bi bi-table"></i> View Expenses
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if page == 'summary' %}active fw-bold{% endif %}" href="{{ url_for('summary') }}">
-                            <i class="bi bi-bar-chart"></i> Summary
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link text-danger" href="{{ url_for('logout') }}">
-                            <i class="bi bi-box-arrow-right"></i> Logout
-                        </a>
-                    </li>
-                </ul>
-            </div>
+<!-- Navigation -->
+{% if current_user.is_authenticated %}
+<nav class="navbar navbar-expand-lg navbar-light">
+<div class="container">
+<a class="navbar-brand" href="{{ url_for('dashboard') }}">
+<i class="bi bi-wallet2"></i> ExpenseTracker
+</a>
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+<span class="navbar-toggler-icon"></span>
+</button>
+<div class="collapse navbar-collapse" id="navbarNav">
+<ul class="navbar-nav ms-auto">
+<li class="nav-item">
+<a class="nav-link {% if page == 'dashboard' %}active fw-bold{% endif %}" href="{{ url_for('dashboard') }}">
+<i class="bi bi-speedometer2"></i> Dashboard
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link {% if page == 'add_expense' %}active fw-bold{% endif %}" href="{{ url_for('add_expense') }}">
+<i class="bi bi-plus-circle"></i> Add Expense
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link {% if page == 'view_expenses' %}active fw-bold{% endif %}" href="{{ url_for('view_expenses') }}">
+<i class="bi bi-table"></i> View Expenses
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link {% if page == 'summary' %}active fw-bold{% endif %}" href="{{ url_for('summary') }}">
+<i class="bi bi-bar-chart"></i> Summary
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link text-danger" href="{{ url_for('logout') }}">
+<i class="bi bi-box-arrow-right"></i> Logout
+</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+{% endif %}
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
         </div>
-    </nav>
     {% endif %}
+{% endwith %}
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="container mt-3">
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+<!-- Main Content -->
+<main class="main-content">
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</main>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="container">
-            {% block content %}{% endblock %}
-        </div>
-    </main>
+<!-- Footer -->
+<footer class="footer text-center">
+    <div class="container">
+        <p class="mb-0">&copy; 2025 ExpenseTracker. Built with Flask & MongoDB</p>
+    </div>
+</footer>
 
-    <!-- Footer -->
-    <footer class="footer text-center">
-        <div class="container">
-            <p class="mb-0">&copy; 2025 ExpenseTracker. Built with Flask & MongoDB</p>
-        </div>
-    </footer>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    {% block scripts %}{% endblock %}
 </body>
 </html>
