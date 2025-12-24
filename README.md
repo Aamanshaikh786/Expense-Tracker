@@ -19,6 +19,19 @@ Data Visualization – Generate bar and pie charts to understand spending patter
 
 Export to CSV – Export all stored expenses to a CSV file for offline use.
 
+## 🖼️ Screenshots
+
+### Login Page 
+![Login Page](screenshots/loginpage.png)
+
+### Dashboard 
+![Dashboard](screenshots/dashboard.png)
+
+### Add Expense
+![Add Expense](screenshots/add_expenses.png)
+
+### Data Visualization (Charts)
+![Charts](screenshots/charts.png)
 
 
 
